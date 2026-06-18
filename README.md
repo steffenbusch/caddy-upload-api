@@ -212,9 +212,7 @@ Representative validation errors:
 Example with `curl`:
 
 ```sh
-curl -X POST \
-  -F 'file=@./report.csv' \
-  http://localhost:8080/upload
+curl -F 'file=@./report.csv' http://localhost:8080/upload
 ```
 
 ### `GET <api_path>/quota`
