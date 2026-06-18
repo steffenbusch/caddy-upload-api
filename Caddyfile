@@ -1,0 +1,24 @@
+{
+	debug
+}
+
+:8080 {
+	vars http.auth.user.id testuser
+
+	upload_api /upload* {
+		api_path /upload
+		temp_upload_dir ./temp-uploads
+		upload_dir ./workspace/uploads
+		workspace_dir ./workspace
+		quota 1GiB
+		min_size 12B
+		max_size 100MiB
+		allowed_extensions .txt .csv
+		#allowed_extensions *
+		#allow_dotfiles
+		allow_overwrite
+		filename_regex "^[A-Za-zÄÖÜäöüß0-9._+(),= -]+$"
+		filename_replacements "ä->ae" "Ä->Ae"
+		filename_error "The file name may only contain letters (A-Z, including German umlauts and ß), numbers, spaces and the following special characters: - . _ + ( ) , =""
+	}
+}
