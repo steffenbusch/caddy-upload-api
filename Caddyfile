@@ -19,6 +19,6 @@
 		allow_overwrite
 		filename_regex "^[A-Za-zÄÖÜäöüß0-9._+(),= -]+$"
 		filename_replacements "ä->ae" "Ä->Ae"
-		filename_error "The file name may only contain letters (A-Z, including German umlauts and ß), numbers, spaces and the following special characters: - . _ + ( ) , =""
+		filename_error "The file name may only contain letters (A-Z, including German umlauts and ß), numbers, spaces and the following special characters: - . _ + ( ) , ="
 	}
 }

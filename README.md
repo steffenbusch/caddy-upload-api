@@ -18,7 +18,7 @@ This plugin introduces a middleware that:
 ### Key Capabilities
 
 - **Quota Endpoint**: Returns current `total`, `used`, and `free` bytes directly from the filesystem.
-- **Config Endpoint**: Exposes `min_size`, `max_size`, `allowed_extensions`, `filename_regex`, and optional `filename_error` for frontend validation.
+- **Config Endpoint**: Exposes `min_size`, `max_size`, `allowed_extensions`, `filename_regex`, optional `filename_error`, and optional `filename_prefixes` for frontend validation.
 - **Optional Overwrite Support**: Existing regular files can be replaced atomically when explicitly enabled.
 - **Configurable Filename Policy**: Use a strict default ASCII-safe pattern or provide your own regex, including Unicode if desired.
 - **Structured Logging**: Successful uploads, rejections, and internal errors are logged with request metadata.
@@ -32,7 +32,7 @@ This plugin introduces a middleware that:
    `POST <api_path>` must be `multipart/form-data` and must contain exactly one file part.
 
 3. **Filename and Extension Checks**
-   The raw client filename is sanitized to a basename, then validated against traversal rules, UTF-8/control character rules, the dotfile policy, the configured regex, and the extension policy.
+   The raw client filename is sanitized to a basename, then validated against traversal rules, UTF-8/control character rules, the dotfile policy, the configured regex, the optional filename prefix policy, and the extension policy.
 
 4. **Temporary Write**
    The file body is streamed into a temporary file inside `temp_upload_dir` (or `upload_dir` if no separate temp directory is configured).
@@ -102,6 +102,11 @@ This plugin introduces a middleware that:
 - **`filename_error`**: Optional user-facing error message returned when the filename does not match `filename_regex`.
   - If unset, the API returns a technical regex-based message.
 
+- **`filename_prefixes`**: Optional allowlist of accepted filename prefixes.
+  - Example: `filename_prefixes report_ request_`
+  - Matching is case-sensitive.
+  - A filename is accepted when it starts with any configured prefix.
+
 - **`filename_replacements`**: Ordered server-side filename replacements in the form `old->new`.
   - Applied after client path sanitation and before dotfile, regex, and extension checks.
   - Useful for normalizing names such as `ö->oe` or `ä->ae`.
@@ -123,6 +128,7 @@ This plugin introduces a middleware that:
       allowed_extensions *
       blocked_extensions .php .html .svg .exe
       allow_dotfiles
+      filename_prefixes report_ request_
       filename_replacements "ö->oe" "Ö->OE" "ä->ae"
       filename_regex "^[A-Za-z0-9._+-]+$"
       filename_error "The file name may only contain letters, numbers, dots, underscores, plus signs, and dashes."
@@ -190,7 +196,7 @@ Status codes:
 
 | Status | Typical cause |
 | --- | --- |
-| `400 Bad Request` | Invalid multipart request, not exactly one file, unsafe filename including forbidden dotfiles, filename longer than 255 bytes, regex mismatch, or file smaller than `min_size`. |
+| `400 Bad Request` | Invalid multipart request, not exactly one file, unsafe filename including forbidden dotfiles, filename longer than 255 bytes, regex mismatch, filename prefix mismatch against configured `filename_prefixes`, or file smaller than `min_size`. |
 | `405 Method Not Allowed` | Method other than `POST`; the response includes `Allow: POST`. |
 | `409 Conflict` | The target file already exists and overwrite is disabled. |
 | `413 Payload Too Large` | File larger than `max_size` or request body exceeds the upload limit. |
@@ -203,6 +209,8 @@ Representative validation errors:
 ```json
 {"success":false,"error":"file is too small: got 11 bytes, minimum is 12 bytes"}
 {"success":false,"error":"filename must match required pattern \"^report_[0-9]{8}\\.csv$\""}
+{"success":false,"error":"filename must start with \"request_\""}
+{"success":false,"error":"filename must start with one of: \"report_\", \"request_\""}
 {"success":false,"error":"dotfiles are not allowed"}
 {"success":false,"error":"filename must not exceed 255 bytes"}
 {"success":false,"error":"file extension \".exe\" is blocked for security reasons"}
@@ -246,7 +254,8 @@ Returns the currently effective upload limits for frontend preflight checks.
   "max_size": 100000000,
   "allowed_extensions": ["*"],
   "filename_regex": "^[A-Za-z0-9._+-]+$",
-  "filename_error": "The file name may only contain letters, numbers, dots, underscores, plus signs, and dashes."
+  "filename_error": "The file name may only contain letters, numbers, dots, underscores, plus signs, and dashes.",
+  "filename_prefixes": ["report_", "request_"]
 }
 ```
 
@@ -272,6 +281,8 @@ Always rejected:
 - invalid UTF-8
 
 The server only ever uses the final basename and never trusts directory components from the client. If `filename_replacements` is configured, those replacements are applied to the sanitized basename before validation and storage.
+
+If `filename_prefixes` is configured, the resulting filename must start with at least one configured prefix such as `report_` or `request_`. Prefix matching is case-sensitive and happens after regex validation but before the extension check.
 
 Examples that are rejected:
 

@@ -140,7 +140,7 @@ func TestFilenameRegexCanReturnConfiguredUserMessage(t *testing.T) {
 	if context["filename_regex"] != h.FilenameRegex {
 		t.Fatalf("log context = %+v", context)
 	}
-	if context["filename_error"] != h.FilenameError {
+	if _, exists := context["filename_error"]; exists {
 		t.Fatalf("log context = %+v", context)
 	}
 }

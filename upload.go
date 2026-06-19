@@ -94,6 +94,10 @@ type UploadAPI struct {
 	// sanitized filename does not match FilenameRegex or the default pattern.
 	FilenameError string `json:"filename_error,omitempty"`
 
+	// FilenamePrefixes optionally restricts accepted filenames to a small set of
+	// allowed leading strings such as report_ or request_.
+	FilenamePrefixes []string `json:"filename_prefixes,omitempty"`
+
 	// FilenameReplacements applies ordered string replacements to sanitized
 	// basenames before validation and extension checks.
 	FilenameReplacements []string `json:"filename_replacements,omitempty"`
@@ -188,6 +192,17 @@ func (h *UploadAPI) Provision(ctx caddy.Context) error {
 		}
 		seenReplacements[oldValue] = struct{}{}
 		h.filenameReplacementRules = append(h.filenameReplacementRules, filenameReplacement{Old: oldValue, New: newValue})
+	}
+
+	seenPrefixes := make(map[string]struct{}, len(h.FilenamePrefixes))
+	for _, prefix := range h.FilenamePrefixes {
+		if err := validateConfiguredFilenamePrefix(prefix); err != nil {
+			return fmt.Errorf("invalid filename_prefixes: %w", err)
+		}
+		if _, exists := seenPrefixes[prefix]; exists {
+			return fmt.Errorf("invalid filename_prefixes: duplicate prefix: %s", prefix)
+		}
+		seenPrefixes[prefix] = struct{}{}
 	}
 
 	for _, extension := range h.BlockedExtensions {
@@ -432,9 +447,15 @@ func (h UploadAPI) handleUpload(w http.ResponseWriter, r *http.Request) {
 			var filenameErr *filenameValidationError
 			if errors.As(err, &filenameErr) && filenameErr.regexMismatch {
 				fields = append(fields, zap.String("filename_regex", h.filenamePattern()))
-				if strings.TrimSpace(h.FilenameError) != "" {
-					fields = append(fields, zap.String("filename_error", h.FilenameError))
-				}
+			}
+			h.respondError(w, r, http.StatusBadRequest, err.Error(), fields...)
+			return
+		}
+		if err := h.validateFilenamePrefix(effectiveFilename); err != nil {
+			_ = part.Close()
+			fields := []zap.Field{zap.String("filename", effectiveFilename)}
+			if filenameReplaced {
+				fields = append(fields, zap.String("original_filename", cleanFilename))
 			}
 			h.respondError(w, r, http.StatusBadRequest, err.Error(), fields...)
 			return
@@ -577,12 +598,14 @@ func (h UploadAPI) handleConfig(w http.ResponseWriter) {
 	if h.allowAllExtensions {
 		extensions = []string{"*"}
 	}
+	prefixes := append([]string{}, h.FilenamePrefixes...)
 	writeJSON(w, http.StatusOK, configResponse{
 		MinSize:           h.MinSize,
 		MaxSize:           h.MaxSize,
 		AllowedExtensions: extensions,
 		FilenameRegex:     h.filenamePattern(),
 		FilenameError:     h.FilenameError,
+		FilenamePrefixes:  prefixes,
 	})
 }
 

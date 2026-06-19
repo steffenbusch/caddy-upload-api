@@ -111,6 +111,12 @@ func (h *UploadAPI) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				return d.ArgErr()
 			}
 			h.FilenameError = strings.Join(args, " ")
+		case "filename_prefixes":
+			prefixes := d.RemainingArgs()
+			if len(prefixes) == 0 {
+				return d.ArgErr()
+			}
+			h.FilenamePrefixes = append(h.FilenamePrefixes, prefixes...)
 		case "filename_replacements":
 			rules := d.RemainingArgs()
 			if len(rules) == 0 {

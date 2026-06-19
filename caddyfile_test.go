@@ -173,3 +173,19 @@ func TestFilenameErrorCaddyfileOption(t *testing.T) {
 		t.Fatalf("filename_error = %q", h.FilenameError)
 	}
 }
+
+func TestFilenamePrefixesCaddyfileOption(t *testing.T) {
+	var h UploadAPI
+	d := caddyfile.NewTestDispenser(`upload_api {
+		filename_prefixes report_ request_
+	}`)
+	if err := h.UnmarshalCaddyfile(d); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(h.FilenamePrefixes); got != 2 {
+		t.Fatalf("filename_prefixes length = %d", got)
+	}
+	if h.FilenamePrefixes[0] != "report_" || h.FilenamePrefixes[1] != "request_" {
+		t.Fatalf("filename_prefixes = %v", h.FilenamePrefixes)
+	}
+}

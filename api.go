@@ -35,6 +35,7 @@ type configResponse struct {
 	AllowedExtensions []string `json:"allowed_extensions"`
 	FilenameRegex     string   `json:"filename_regex"`
 	FilenameError     string   `json:"filename_error,omitempty"`
+	FilenamePrefixes  []string `json:"filename_prefixes"`
 }
 
 type uploadResponse struct {

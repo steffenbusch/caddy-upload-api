@@ -247,6 +247,9 @@ func TestUploadConfigEndpoint(t *testing.T) {
 	if response.FilenameError != "" {
 		t.Fatalf("filename error = %q", response.FilenameError)
 	}
+	if len(response.FilenamePrefixes) != 0 {
+		t.Fatalf("filename prefixes = %v", response.FilenamePrefixes)
+	}
 	if strings.Contains(rec.Body.String(), "blocked_extensions") {
 		t.Fatalf("config response exposes blocked extensions: %s", rec.Body)
 	}
@@ -255,6 +258,7 @@ func TestUploadConfigEndpoint(t *testing.T) {
 func TestUploadConfigEndpointIncludesFilenameError(t *testing.T) {
 	h := newTestHandler(t)
 	h.FilenameError = "Use only approved request filenames."
+	h.FilenamePrefixes = []string{"report_", "request_"}
 
 	rec := serve(t, h, httptest.NewRequest(http.MethodGet, "/upload/config", nil))
 	if rec.Code != http.StatusOK {
@@ -265,6 +269,9 @@ func TestUploadConfigEndpointIncludesFilenameError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if response.FilenameError != h.FilenameError {
+		t.Fatalf("response = %+v", response)
+	}
+	if strings.Join(response.FilenamePrefixes, ",") != "report_,request_" {
 		t.Fatalf("response = %+v", response)
 	}
 }
@@ -402,6 +409,22 @@ func TestProvisionRejectsInvalidExtensionModes(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid filename prefix", func(t *testing.T) {
+		h := newHandler(".txt")
+		h.FilenamePrefixes = []string{"../report_"}
+		if err := h.Provision(caddy.Context{}); err == nil || !strings.Contains(err.Error(), "invalid filename_prefixes") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+
+	t.Run("duplicate filename prefix", func(t *testing.T) {
+		h := newHandler(".txt")
+		h.FilenamePrefixes = []string{"report_", "report_"}
+		if err := h.Provision(caddy.Context{}); err == nil || !strings.Contains(err.Error(), "duplicate prefix") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+
 	t.Run("wildcard is valid", func(t *testing.T) {
 		h := newHandler("*")
 		if err := h.Provision(caddy.Context{}); err != nil {
@@ -478,6 +501,54 @@ func TestClientFilenameSanitation(t *testing.T) {
 			}
 			if logs.FilterMessage("client filename sanitized").Len() != 1 {
 				t.Fatalf("logs = %+v", logs.All())
+			}
+		})
+	}
+}
+
+func TestUploadRejectsFilenamePrefixMismatch(t *testing.T) {
+	h := newTestHandler(t)
+	h.FilenamePrefixes = []string{"report_", "request_"}
+
+	rec := serve(t, h, multipartRequest(t, map[string]string{"invoice_20260619.txt": "hello"}))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var response errorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error != `filename must start with one of: "report_", "request_"` {
+		t.Fatalf("response = %+v", response)
+	}
+}
+
+func TestUploadRejectsSingleFilenamePrefixMismatch(t *testing.T) {
+	h := newTestHandler(t)
+	h.FilenamePrefixes = []string{"request_"}
+
+	rec := serve(t, h, multipartRequest(t, map[string]string{"invoice_20260619.txt": "hello"}))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var response errorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error != `filename must start with "request_"` {
+		t.Fatalf("response = %+v", response)
+	}
+}
+
+func TestUploadAcceptsAnyConfiguredFilenamePrefix(t *testing.T) {
+	h := newTestHandler(t)
+	h.FilenamePrefixes = []string{"report_", "request_"}
+
+	for _, filename := range []string{"report_20260619.txt", "request_20260619.txt"} {
+		t.Run(filename, func(t *testing.T) {
+			rec := serve(t, h, multipartRequest(t, map[string]string{filename: "hello"}))
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
 			}
 		})
 	}

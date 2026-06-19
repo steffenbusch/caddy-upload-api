@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -143,6 +144,42 @@ func (h UploadAPI) validateFilename(filename string) error {
 	return nil
 }
 
+// validateConfiguredFilenamePrefix rejects malformed prefix configuration so
+// operators get a clear startup error instead of a silently ineffective rule.
+func validateConfiguredFilenamePrefix(prefix string) error {
+	if prefix == "" {
+		return errors.New("empty prefix")
+	}
+	if !utf8.ValidString(prefix) {
+		return fmt.Errorf("prefix %q must be valid UTF-8", prefix)
+	}
+	if strings.Contains(prefix, "/") || strings.Contains(prefix, `\`) ||
+		strings.Contains(prefix, "../") || strings.Contains(prefix, `..\`) {
+		return fmt.Errorf("prefix %q must not contain path separators or traversal components", prefix)
+	}
+	for _, char := range prefix {
+		if char == 0 || unicode.IsControl(char) {
+			return fmt.Errorf("prefix %q must not contain NUL or control characters", prefix)
+		}
+	}
+	return nil
+}
+
+// validateFilenamePrefix applies the optional allowlist of required leading
+// strings after the filename itself has already passed the generic safety and
+// regex checks.
+func (h UploadAPI) validateFilenamePrefix(filename string) error {
+	if len(h.FilenamePrefixes) == 0 {
+		return nil
+	}
+	for _, prefix := range h.FilenamePrefixes {
+		if strings.HasPrefix(filename, prefix) {
+			return nil
+		}
+	}
+	return errors.New(h.filenamePrefixError())
+}
+
 // filenamePattern returns the configured regex or the secure default.
 func (h UploadAPI) filenamePattern() string {
 	if h.FilenameRegex != "" {
@@ -158,6 +195,19 @@ func (h UploadAPI) filenamePatternError() string {
 		return h.FilenameError
 	}
 	return fmt.Sprintf("filename must match required pattern %q", h.filenamePattern())
+}
+
+// filenamePrefixError keeps the prefix mismatch message readable for end users
+// without requiring an additional custom error option.
+func (h UploadAPI) filenamePrefixError() string {
+	if len(h.FilenamePrefixes) == 1 {
+		return fmt.Sprintf("filename must start with %q", h.FilenamePrefixes[0])
+	}
+	values := make([]string, 0, len(h.FilenamePrefixes))
+	for _, prefix := range h.FilenamePrefixes {
+		values = append(values, strconv.Quote(prefix))
+	}
+	return fmt.Sprintf("filename must start with one of: %s", strings.Join(values, ", "))
 }
 
 // validateExtension applies the active blacklist first, then the configured
