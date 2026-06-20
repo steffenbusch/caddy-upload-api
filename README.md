@@ -59,7 +59,10 @@ This plugin introduces a middleware that:
 
 - **`temp_upload_dir`**: Optional staging directory for temporary upload files.
   - Default: `upload_dir`
-  - Should not be exposed via `file_server` or browse.
+  - May intentionally live outside `upload_dir` so in-progress files stay out
+    of publicly browsable trees.
+  - Should not be exposed via `file_server` or browse; that is a deployment
+    responsibility, not something the upload API can infer from the path.
   - Should be on the same filesystem as `upload_dir` for atomic storage.
 
 - **`workspace_dir`**: Directory whose complete recursive size is used for quota calculations.
@@ -160,6 +163,11 @@ emit cache headers or ETags for these endpoints.
 ### `POST <api_path>`
 
 Accepts exactly one multipart file.
+
+The request itself must be `multipart/form-data`, but the handler does not
+trust or enforce the uploaded part's own `Content-Type` header as a security
+control. Acceptance is based on filename validation, extension rules, size
+limits, and quota checks instead.
 
 Successful response:
 
@@ -317,6 +325,9 @@ current workspace size without the temp upload file + upload size <= quota
 ```
 
 There is no synchronization between parallel instances. Two concurrent uploads may both observe the same free quota and together exceed it. A later quota request will report the actual filesystem state.
+
+This is an explicit consequence of the plugin's model: no shared in-memory state, no background coordination, and no cross-instance locking.
+A transactional hard quota would require synchronization or an external coordination mechanism and is intentionally out of scope here.
 
 ## Overwrite Behavior
 

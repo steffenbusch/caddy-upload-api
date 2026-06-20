@@ -237,6 +237,8 @@ func (h *UploadAPI) Provision(ctx caddy.Context) error {
 	}
 	// Temporary files may live outside UploadDir so deployments can keep them
 	// out of publicly browsable trees while preserving the same upload flow.
+	// Whether TempUploadDir is exposed by other handlers is a deployment
+	// responsibility; the upload API cannot infer that from the filesystem path.
 	if err := os.MkdirAll(h.tempUploadDir(), 0o750); err != nil {
 		return fmt.Errorf("create temp_upload_dir: %w", err)
 	}
@@ -357,6 +359,10 @@ func (h UploadAPI) handleUpload(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, r, http.StatusBadRequest, "multipart/form-data required")
 		return
 	}
+	// The request itself must be multipart/form-data, but the handler
+	// intentionally does not trust or enforce per-file Content-Type headers as a
+	// security control. Acceptance is based on filename rules, size limits, and
+	// quota checks instead.
 
 	// MaxBytesReader is still required for clients without a useful
 	// Content-Length and for oversized multipart bodies.
@@ -527,7 +533,10 @@ func (h UploadAPI) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The temporary upload file is excluded because the quota decision is based
-	// on the workspace before the final file becomes visible.
+	// on the workspace before the final file becomes visible. This is a
+	// best-effort quota check only: without synchronization between concurrent
+	// requests or instances, parallel uploads can still observe the same free
+	// space and together exceed Quota.
 	used, err := calculateWorkspaceSizeExcluding(h.WorkspaceDir, tempPath)
 	if err != nil {
 		h.respondError(w, r, http.StatusInternalServerError, "could not calculate workspace size", zap.NamedError("cause", err))
