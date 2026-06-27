@@ -308,8 +308,8 @@ The plugin applies a blocked extension list even when `allowed_extensions *` is 
 Blocked extensions include:
 
 ```text
-.jsp .jspf .jspx .xtp .php .html .xhtml .htm .js .swf .xht .chm .hta
-.htc .svg .stm .shtm .shtml .asp .aspx .jnlp .jar .class .cgi .exe .xap
+.asp .aspx .cgi .chm .class .exe .hta .htc .htm .html .jar .jnlp .js .jsp .jspf .jspx
+.mht .mhtml .php .shtm .shtml .stm .svg .svgz .swf .xap .xht .xhtml .xtp
 ```
 
 The blocked list is applied case-insensitively to the final file extension. Filenames such as `example.html.txt` remain valid because their final extension is `.txt`. When `blocked_extensions` is configured, that configured list fully replaces the built-in defaults.

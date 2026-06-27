@@ -29,7 +29,7 @@ import (
 const (
 	// defaultBlockedExtensionList is the secure default denylist. It applies
 	// unless a deployment explicitly overrides it with blocked_extensions.
-	defaultBlockedExtensionList = ".jsp .jspf .jspx .xtp .php .html .xhtml .htm .js .swf .xht .chm .hta .htc .svg .stm .shtm .shtml .asp .aspx .jnlp .jar .class .cgi .exe .xap"
+	defaultBlockedExtensionList = ".asp .aspx .cgi .chm .class .exe .hta .htc .htm .html .jar .jnlp .js .jsp .jspf .jspx .mht .mhtml .php .shtm .shtml .stm .svg .svgz .swf .xap .xht .xhtml .xtp"
 )
 
 type filenameValidationError struct {
