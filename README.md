@@ -113,6 +113,7 @@ This plugin introduces a middleware that:
 - **`filename_replacements`**: Ordered server-side filename replacements in the form `old->new`.
   - Applied after client path sanitation and before dotfile, regex, and extension checks.
   - Useful for normalizing names such as `ö->oe` or `ä->ae`.
+  - Whitespace is literal, so `" ->_"` replaces spaces with underscores.
   - The final stored filename is reported back in the upload response.
 
 ### Example Configuration (Caddyfile)

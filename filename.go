@@ -86,16 +86,15 @@ func (h UploadAPI) replaceFilename(filename string) (string, bool) {
 }
 
 // parseFilenameReplacement parses an ordered replacement rule in the form
-// "old->new". Both sides must be non-empty.
+// "old->new". Both sides must be non-empty. Whitespace is treated literally so
+// configurations can replace spaces or preserve intentional padding.
 func parseFilenameReplacement(value string) (oldValue, newValue string, err error) {
-	parts := strings.Split(value, "->")
-	switch len(parts) {
-	case 2:
-		oldValue = strings.TrimSpace(parts[0])
-		newValue = strings.TrimSpace(parts[1])
-	default:
+	if strings.Count(value, "->") != 1 {
 		return "", "", fmt.Errorf("expected old->new in %q", value)
 	}
+	parts := strings.SplitN(value, "->", 2)
+	oldValue = parts[0]
+	newValue = parts[1]
 	if oldValue == "" {
 		return "", "", fmt.Errorf("empty source in %q", value)
 	}

@@ -130,15 +130,15 @@ func TestBlockedExtensionsCaddyfileOption(t *testing.T) {
 func TestFilenameReplacementsCaddyfileOption(t *testing.T) {
 	var h UploadAPI
 	d := caddyfile.NewTestDispenser(`upload_api {
-		filename_replacements "ö->oe" "Ö->OE" "ä->ae"
+		filename_replacements "ö->oe" "Ö->OE" "ä->ae" " ->_"
 	}`)
 	if err := h.UnmarshalCaddyfile(d); err != nil {
 		t.Fatal(err)
 	}
-	if got := len(h.FilenameReplacements); got != 3 {
+	if got := len(h.FilenameReplacements); got != 4 {
 		t.Fatalf("filename_replacements length = %d", got)
 	}
-	if h.FilenameReplacements[0] != "ö->oe" || h.FilenameReplacements[2] != "ä->ae" {
+	if h.FilenameReplacements[0] != "ö->oe" || h.FilenameReplacements[2] != "ä->ae" || h.FilenameReplacements[3] != " ->_" {
 		t.Fatalf("filename_replacements = %v", h.FilenameReplacements)
 	}
 }
@@ -149,6 +149,14 @@ func TestParseFilenameReplacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	if oldValue != "ö" || newValue != "oe" {
+		t.Fatalf("parsed replacement = %q -> %q", oldValue, newValue)
+	}
+
+	oldValue, newValue, err = parseFilenameReplacement(" ->_")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oldValue != " " || newValue != "_" {
 		t.Fatalf("parsed replacement = %q -> %q", oldValue, newValue)
 	}
 

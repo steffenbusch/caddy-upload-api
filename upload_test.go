@@ -409,6 +409,17 @@ func TestProvisionRejectsInvalidExtensionModes(t *testing.T) {
 		}
 	})
 
+	t.Run("filename replacement can target spaces", func(t *testing.T) {
+		h := newHandler(".txt")
+		h.FilenameReplacements = []string{" ->_"}
+		if err := h.Provision(caddy.Context{}); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if got, renamed := h.replaceFilename("a b.txt"); !renamed || got != "a_b.txt" {
+			t.Fatalf("replaceFilename() = %q, %v", got, renamed)
+		}
+	})
+
 	t.Run("invalid filename prefix", func(t *testing.T) {
 		h := newHandler(".txt")
 		h.FilenamePrefixes = []string{"../report_"}
