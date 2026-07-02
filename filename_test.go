@@ -86,6 +86,40 @@ func TestFilenameReplacementsRenameUploadAndResponse(t *testing.T) {
 	}
 }
 
+func TestFilenameReplacementsCanRemoveSpacesBeforeRegexValidation(t *testing.T) {
+	h := newTestHandler(t)
+	h.allowAllExtensions = true
+	h.extensions = map[string]struct{}{}
+	h.FilenameRegex = `^[-A-Za-z0-9._+(),=-]+$`
+	h.filenameRE = regexpMustCompile(t, h.FilenameRegex)
+	h.FilenameReplacements = []string{"ä->ae", "ö->oe", "ü->ue", "Ä->Ae", "Ö->Oe", "Ü->Ue", "ß->ss", " ->_"}
+	h.filenameReplacementRules = []filenameReplacement{
+		{Old: "ä", New: "ae"},
+		{Old: "ö", New: "oe"},
+		{Old: "ü", New: "ue"},
+		{Old: "Ä", New: "Ae"},
+		{Old: "Ö", New: "Oe"},
+		{Old: "Ü", New: "Ue"},
+		{Old: "ß", New: "ss"},
+		{Old: " ", New: "_"},
+	}
+
+	rec := serve(t, h, multipartRequest(t, map[string]string{"test - spaces_and_umlauts ö ä ü ß.txt": "hello"}))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if _, err := os.Stat(filepath.Join(h.UploadDir, "test_-_spaces_and_umlauts_oe_ae_ue_ss.txt")); err != nil {
+		t.Fatal(err)
+	}
+	var response uploadResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+	if !response.Renamed || response.OriginalFilename != "test - spaces_and_umlauts ö ä ü ß.txt" || response.Filename != "test_-_spaces_and_umlauts_oe_ae_ue_ss.txt" {
+		t.Fatalf("response = %+v", response)
+	}
+}
+
 func TestCustomFilenameRegexCanAllowUnicode(t *testing.T) {
 	h := newTestHandler(t)
 	h.FilenameRegex = `^[\p{L}\p{N}._+(),=: -]+$`
